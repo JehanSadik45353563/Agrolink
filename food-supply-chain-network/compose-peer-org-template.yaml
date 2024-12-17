@@ -1,0 +1,83 @@
+# Copyright IBM Corp. All Rights Reserved.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# version: '3.7'
+
+volumes:
+  ${PEER_NAME}.${PEER_ORG}.example.com:
+
+networks:
+  test:
+    name: ${NETWORK_NAME}
+
+services:
+  ${COUCHDB_NAME}:
+    container_name: ${COUCHDB_NAME}
+    image: couchdb:3.3.2
+    labels:
+      service: hyperledger-fabric
+    # Populate the COUCHDB_USER and COUCHDB_PASSWORD to set an admin user and password
+    # for CouchDB.  This will prevent CouchDB from operating in an "Admin Party" mode.
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=adminpw
+    # Comment/Uncomment the port mapping if you want to hide/expose the CouchDB service,
+    # for example map it to utilize Fauxton User Interface in dev environments.
+    ports:
+      - "${COUCHDB_PORT}:5984"
+    networks:
+      - test
+  
+  ${PEER_NAME}.${PEER_ORG}.example.com:
+    container_name: ${PEER_NAME}.${PEER_ORG}.example.com
+    image: hyperledger/fabric-peer:latest
+    labels:
+      service: hyperledger-fabric
+    environment:
+      - FABRIC_CFG_PATH=/etc/hyperledger/peercfg
+      - FABRIC_LOGGING_SPEC=INFO
+      #- FABRIC_LOGGING_SPEC=DEBUG
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_PROFILE_ENABLED=false
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      # Peer specific variables
+      - CORE_PEER_ID=${PEER_NAME}.${PEER_ORG}.example.com
+      - CORE_PEER_ADDRESS=${PEER_NAME}.${PEER_ORG}.example.com:${PEER_PORT1}
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:${PEER_PORT1}
+      - CORE_PEER_CHAINCODEADDRESS=${PEER_NAME}.${PEER_ORG}.example.com:${PEER_PORT2}
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:${PEER_PORT2}
+      - CORE_PEER_GOSSIP_BOOTSTRAP=${PEER_NAME}.${PEER_ORG}.example.com:${PEER_PORT1}
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=${PEER_NAME}.${PEER_ORG}.example.com:${PEER_PORT1}
+      # MSP ID
+      - CORE_PEER_LOCALMSPID=${PEER_MSP}
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_OPERATIONS_LISTENADDRESS=${PEER_NAME}.${PEER_ORG}.example.com:${PEER_PORT3}
+      - CORE_METRICS_PROVIDER=prometheus
+      # Peer Name need to be change
+      - CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG={"peername":"${PEER_NAME}${PEER_ORG}"}
+      - CORE_CHAINCODE_EXECUTETIMEOUT=300s
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=${NETWORK_NAME}
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=${COUCHDB_NAME}:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=admin
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=adminpw
+    depends_on:
+      - ${COUCHDB_NAME}
+    volumes:
+      - /var/run/:/host/var/run/
+      - ../../organizations/peerOrganizations/${PEER_ORG}.example.com/peers/${PEER_NAME}.${PEER_ORG}.example.com:/etc/hyperledger/fabric
+      - ${PEER_NAME}.${PEER_ORG}.example.com:/var/hyperledger/production
+      - ../../configtx:/etc/hyperledger/peercfg
+    working_dir: /root
+    command: peer node start
+    ports:
+      - ${PEER_PORT1}:${PEER_PORT1}
+      - ${PEER_PORT2}:${PEER_PORT2}
+      - ${PEER_PORT3}:${PEER_PORT3}
+    networks:
+      - test

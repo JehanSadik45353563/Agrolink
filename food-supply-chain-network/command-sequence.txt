@@ -1,0 +1,18 @@
+source generate-ca-config.sh
+makeDirs
+create_ca_org
+create_ca_orderer
+ca_up
+create_register_enroll_org
+create_peers_orderers
+peer_up
+
+bash network.sh
+bash deploy_transaction_contract.sh
+bash invoke-initledger.sh
+bash invoke-getalltransactions.sh
+bash invoke-createTransaction.sh
+
+down
+cleanup
+remove_docker_images
